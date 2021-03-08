@@ -2,7 +2,7 @@ import os
 data_dir = os.getcwd()+'/data/'
 train_dir = data_dir+'gaiic_track3_round1_train_20210228.tsv'
 test_dir = data_dir+'gaiic_track3_round1_testA_20210228.tsv'
-
+model_dir = 'history_models/' + 'model.pth'
 gpu = ''
 
 dev_split_size = 0.1

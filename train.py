@@ -25,11 +25,14 @@ def epoch_train(train_loader, model, optimizer, scheduler, epoch):
 
 
 def train(train_loader, dev_loader, model, optimizer, scheduler):
+    best_accuracy = 0.0
     for epoch in range(1, config.epoch_num + 1):
         epoch_train(train_loader, model, optimizer, scheduler,epoch)
         with torch.no_grad():
             metric = dev(dev_loader, model)
             print("epoch: {}, dev loss: {}, accuracy: {}".format(epoch, metric['loss'],metric['accuracy']))
+            if metric['accuracy'] > best_accuracy:
+                torch.save(model, config.model_dir)
     logging.info("Training Finished!")
 
 def dev(data_loader, model, mode='dev'):
