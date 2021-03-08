@@ -23,7 +23,7 @@ class BiLSTM_Cosine(nn.Module):
         )
         self.linearLayer = nn.Linear(hidden_size * 2, linearLayerSize)
         self.criteria = nn.BCELoss()
-    def forward(self, left_x,right_x,y):
+    def forward(self, left_x,right_x):
         left_embeddings = self.embedding(left_x)
         right_embeddings = self.embedding(right_x)
         left_output, (left_h,_) = self.bilstm(left_embeddings)
@@ -33,5 +33,8 @@ class BiLSTM_Cosine(nn.Module):
         left_linearVec = self.linearLayer(left_h)
         right_linearVec = self.linearLayer(right_h)
         score = (torch.cosine_similarity(left_linearVec,right_linearVec)+1)/2
-        loss = self.criteria(score,y.to(torch.float32))
-        return score,loss
+        return score
+    def loss(self,left_x,right_x,y):
+        score = self.forward(left_x,right_x)
+        loss = self.criteria(score, y.to(torch.float32))
+        return loss

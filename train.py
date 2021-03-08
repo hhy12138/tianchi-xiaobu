@@ -1,5 +1,7 @@
 import torch
 from torch.utils.data import DataLoader
+from utils.data_loader import SimDataset
+from utils.read import read
 
 from config import config
 import logging
@@ -14,7 +16,7 @@ def epoch_train(train_loader, model, optimizer, scheduler, epoch):
     for idx, batch_samples in enumerate(tqdm(train_loader)):
         left_text_tokens, right_text_tokens, labels, left_mask_tokens, right_mask_tokens, left_lens, right_lens = batch_samples
         model.zero_grad()
-        scores,loss = model.forward(left_text_tokens, right_text_tokens,labels)
+        loss = model.loss(left_text_tokens, right_text_tokens,labels)
         train_loss += loss.item()
         loss.backward()
         optimizer.step()
@@ -43,7 +45,8 @@ def dev(data_loader, model, mode='dev'):
     for idx, batch_samples in enumerate(data_loader):
         left_text_tokens, right_text_tokens, labels, left_mask_tokens, right_mask_tokens, left_lens, right_lens = batch_samples
 
-        y_pred,loss = model.forward(left_text_tokens, right_text_tokens,labels)
+        y_pred= model.forward(left_text_tokens, right_text_tokens)
+        loss = model.loss(left_text_tokens, right_text_tokens,labels)
         pred_y.extend(y_pred.round())
         true_y.extend(labels)
         dev_losses += loss.item()
@@ -54,3 +57,19 @@ def dev(data_loader, model, mode='dev'):
     dev_loss = float(dev_losses) / len(data_loader)
     metrix['loss'] = dev_loss
     return metrix
+
+def test():
+    y_preds = []
+    X,Y = read(config.test_dir,mode='test')
+    Y = [0]*len(X)
+    test_dataset = SimDataset(X,Y)
+    test_loader = DataLoader(test_dataset, batch_size=config.batch_size,
+                              shuffle=False, collate_fn=test_dataset.collate_fn)
+    model = torch.load(config.model_dir)
+    for idx, batch_samples in enumerate(tqdm(test_loader)):
+        left_text_tokens, right_text_tokens, labels, left_mask_tokens, right_mask_tokens, left_lens, right_lens = batch_samples
+        y_pred= model.forward(left_text_tokens, right_text_tokens)
+        y_preds.extend(y_pred)
+    with open(config.output_dir,'w') as f:
+        for i in y_preds:
+            f.write(str(i.item())+'\n')
