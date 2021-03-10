@@ -79,7 +79,7 @@ def test():
     with open(config.output_dir,'w') as f:
         for i in y_preds:
             f.write(str(i.item())+'\n')
-test()
+#test()
 ###################
 def test1(model_dir,output_dir):
     y_preds = []
