@@ -1,0 +1,5 @@
+运行方法
+
+先运行word2vec.py
+再运行run.py
+测试集答案：调用train.py中的test函数

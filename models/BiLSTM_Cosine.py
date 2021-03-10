@@ -48,7 +48,7 @@ class BiLSTM_Cosine(nn.Module):
         right_h = torch.cat((right_h[-1], right_h[-2]), 1)
         left_linearVec = self.linearLayer(self.leakRelu(left_h))
         right_linearVec = self.linearLayer(self.leakRelu(right_h))
-        cosim = ((torch.cosine_similarity(left_linearVec,right_linearVec)+1)/2)
+        cosim = (torch.cosine_similarity(left_linearVec,right_linearVec)+1)/2
         score = cosim*cosim
         return score
     def loss(self,left_x,right_x,y,left_text_bitokens,right_text_bitokens):

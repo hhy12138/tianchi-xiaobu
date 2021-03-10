@@ -36,7 +36,9 @@ def trainBiGram():
     model = Word2Vec(LineSentence("tmpData/bi-gramTmp.txt"), sg=1,size=100, window=5, min_count=1, iter=10,workers=multiprocessing.cpu_count())
     model.save("vec/bi-gram.vec")
 if __name__=='__main__':
-    # generateOneGram()
-    # trainOneGram()
-    model = Word2Vec.load('vec/bi-gram.vec')
-    print(model.wv['1|2'])
+    generateOneGram()
+    trainOneGram()
+    generateBiGram()
+    trainBiGram()
+    #model = Word2Vec.load('vec/bi-gram.vec')
+    #print(model.wv['1|2'])
