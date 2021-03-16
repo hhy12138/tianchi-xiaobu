@@ -12,10 +12,11 @@ from train import train
 from gensim.models import Word2Vec
 from dataAugmentation import dataAug
 import torch
+import random
 
 def dev_split(dataset_dir):
     X,Y = read(dataset_dir,mode='train')
-    x_train, x_dev, y_train, y_dev = train_test_split(X, Y, test_size=config.dev_split_size, random_state=0)
+    x_train, x_dev, y_train, y_dev = train_test_split(X, Y, test_size=config.dev_split_size, random_state=random.randint(0,1000))
     return x_train, x_dev, y_train, y_dev
 
 def simple_run():

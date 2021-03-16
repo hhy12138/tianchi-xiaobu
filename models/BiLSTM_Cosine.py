@@ -32,10 +32,12 @@ class BiLSTM_Cosine(nn.Module):
             dropout=drop_out,
             bidirectional=True
         )
-        self.linearLayer = nn.Linear(hidden_size * 2, linearLayerSize)
+        self.linearLayer1 = nn.Linear(hidden_size * 2, linearLayerSize)
+        self.linearLayer2 = nn.Linear(4, 1)
         self.leakRelu = nn.LeakyReLU()
+        self.sigmoid = nn.Sigmoid()
         self.criteria = nn.BCELoss()
-    def forward(self, left_x,right_x,left_text_bitokens,right_text_bitokens):
+    def forward(self, left_x,right_x,left_text_bitokens,right_text_bitokens,lenDiffRate,editDistanceRate,sameWdsRate):
         left_oneEmbeddings = self.embedding(left_x)
         right_oneEmbeddings = self.embedding(right_x)
         left_biEmbeddings = self.bigramEmbedding(left_text_bitokens)
@@ -46,13 +48,20 @@ class BiLSTM_Cosine(nn.Module):
         right_output, (right_h,_) = self.bilstm(right_embeddings)
         left_h = torch.cat((left_h[-1],left_h[-2]), 1)
         right_h = torch.cat((right_h[-1], right_h[-2]), 1)
-        left_linearVec = self.linearLayer(self.leakRelu(left_h))
-        right_linearVec = self.linearLayer(self.leakRelu(right_h))
+        left_linearVec = self.linearLayer1(self.leakRelu(left_h))
+        right_linearVec = self.linearLayer1(self.leakRelu(right_h))
         cosim = (torch.cosine_similarity(left_linearVec,right_linearVec)+1)/2
-        score = cosim*cosim
+        cosim_score = cosim*cosim*cosim*cosim
+        cosim_score = cosim_score.reshape((-1,1))
+        lenDiffRate = lenDiffRate.reshape((-1, 1))
+        editDistanceRate = editDistanceRate.reshape((-1, 1))
+        sameWdsRate = sameWdsRate.reshape((-1, 1))
+        all_features = torch.cat((cosim_score.reshape((-1,1)),lenDiffRate.reshape((-1,1)),editDistanceRate.reshape((-1,1)),sameWdsRate.reshape((-1,1))),1)
+        all_features = all_features.float()
+        score = self.sigmoid(self.linearLayer2(all_features)).flatten()
         return score
-    def loss(self,left_x,right_x,y,left_text_bitokens,right_text_bitokens):
-        score = self.forward(left_x,right_x,left_text_bitokens,right_text_bitokens)
+    def loss(self,left_x,right_x,y,left_text_bitokens,right_text_bitokens,lenDiffRate,editDistanceRate,sameWdsRate):
+        score = self.forward(left_x,right_x,left_text_bitokens,right_text_bitokens,lenDiffRate,editDistanceRate,sameWdsRate)
         self.criteria.weight = y*2+1
         loss = self.criteria(score, y.to(torch.float32))
         return loss

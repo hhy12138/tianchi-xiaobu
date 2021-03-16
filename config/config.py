@@ -3,8 +3,8 @@ data_dir = os.getcwd()+'/data/'
 train_dir = data_dir+'gaiic_track3_round1_train_20210228.tsv'
 test_dir = data_dir+'gaiic_track3_round1_testA_20210228.tsv'
 model_dir = 'history_models/' + 'model.pth'
-output_dir = 'output/' + 'result10.txt'
-gpu = '0'
+output_dir = 'output/' + 'result.txt'
+gpu = ''
 
 dev_split_size = 0.4
 batch_size = 128

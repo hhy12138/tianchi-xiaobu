@@ -9,16 +9,17 @@ import logging
 from tqdm import tqdm
 
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import roc_curve,auc
 import numpy as np
 
 def epoch_train(train_loader, model, optimizer, scheduler, epoch,device):
     model.train()
     train_loss = 0.0
     for idx, batch_samples in enumerate(tqdm(train_loader)):
-        left_text_tokens, right_text_tokens, labels, left_mask_tokens, right_mask_tokens, left_lens, right_lens,left_text_bitokens,right_text_bitokens = batch_samples
-        left_text_tokens, right_text_tokens, labels, left_mask_tokens, right_mask_tokens, left_lens, right_lens,left_text_bitokens,right_text_bitokens = left_text_tokens.to(device), right_text_tokens.to(device), labels.to(device), left_mask_tokens.to(device), right_mask_tokens.to(device), left_lens, right_lens,left_text_bitokens.to(device),right_text_bitokens.to(device)
+        left_text_tokens, right_text_tokens, labels, left_mask_tokens, right_mask_tokens, left_lens, right_lens,left_text_bitokens,right_text_bitokens,lenDiffRate,editDistanceRate,sameWdsRate = batch_samples
+        left_text_tokens, right_text_tokens, labels, left_mask_tokens, right_mask_tokens, left_lens, right_lens,left_text_bitokens,right_text_bitokens,lenDiffRate,editDistanceRate,sameWdsRate = left_text_tokens.to(device), right_text_tokens.to(device), labels.to(device), left_mask_tokens.to(device), right_mask_tokens.to(device), left_lens, right_lens,left_text_bitokens.to(device),right_text_bitokens.to(device),lenDiffRate.to(device),editDistanceRate.to(device),sameWdsRate.to(device)
         model.zero_grad()
-        loss = model.loss(left_text_tokens, right_text_tokens,labels,left_text_bitokens,right_text_bitokens)
+        loss = model.loss(left_text_tokens, right_text_tokens,labels,left_text_bitokens,right_text_bitokens,lenDiffRate,editDistanceRate,sameWdsRate)
         train_loss += loss.item()
         loss.backward()
         optimizer.step()
@@ -34,7 +35,7 @@ def train(train_loader, dev_loader, model, optimizer, scheduler,device):
         epoch_train(train_loader, model, optimizer, scheduler,epoch,device)
         with torch.no_grad():
             metric = dev(dev_loader, model,device)
-            print("epoch: {}, dev loss: {}, accuracy: {}".format(epoch, metric['loss'],metric['accuracy']))
+            print("epoch: {}, dev loss: {}, accuracy: {}, auc: {}".format(epoch, metric['loss'],metric['accuracy'],metric['auc']))
             if metric['accuracy'] > best_accuracy:
                 torch.save(model, config.model_dir)
     logging.info("Training Finished!")
@@ -45,10 +46,10 @@ def dev(data_loader, model, device,mode='dev'):
     pred_y = []
     dev_losses = 0
     for idx, batch_samples in enumerate(data_loader):
-        left_text_tokens, right_text_tokens, labels, left_mask_tokens, right_mask_tokens, left_lens, right_lens,left_text_bitokens,right_text_bitokens = batch_samples
-        left_text_tokens, right_text_tokens, labels, left_mask_tokens, right_mask_tokens, left_lens, right_lens,left_text_bitokens,right_text_bitokens = left_text_tokens.to(device), right_text_tokens.to(device), labels.to(device), left_mask_tokens.to(device), right_mask_tokens.to(device), left_lens, right_lens,left_text_bitokens.to(device),right_text_bitokens.to(device)
-        y_pred= model.forward(left_text_tokens, right_text_tokens,left_text_bitokens,right_text_bitokens).cpu()
-        loss = model.loss(left_text_tokens, right_text_tokens,labels,left_text_bitokens,right_text_bitokens)
+        left_text_tokens, right_text_tokens, labels, left_mask_tokens, right_mask_tokens, left_lens, right_lens,left_text_bitokens,right_text_bitokens,lenDiffRate,editDistanceRate,sameWdsRate = batch_samples
+        left_text_tokens, right_text_tokens, labels, left_mask_tokens, right_mask_tokens, left_lens, right_lens,left_text_bitokens,right_text_bitokens,lenDiffRate,editDistanceRate,sameWdsRate = left_text_tokens.to(device), right_text_tokens.to(device), labels.to(device), left_mask_tokens.to(device), right_mask_tokens.to(device), left_lens, right_lens,left_text_bitokens.to(device),right_text_bitokens.to(device),lenDiffRate.to(device),editDistanceRate.to(device),sameWdsRate.to(device)
+        y_pred= model.forward(left_text_tokens, right_text_tokens,left_text_bitokens,right_text_bitokens,lenDiffRate,editDistanceRate,sameWdsRate).cpu()
+        loss = model.loss(left_text_tokens, right_text_tokens,labels,left_text_bitokens,right_text_bitokens,lenDiffRate,editDistanceRate,sameWdsRate)
         pred_y.extend(y_pred.round())
         true_y.extend(labels.cpu())
         dev_losses += loss.item()
@@ -56,6 +57,8 @@ def dev(data_loader, model, device,mode='dev'):
     metrix = {}
     accuracy = accuracy_score(true_y,pred_y)
     metrix['accuracy'] = accuracy
+    fpr, tpr, thresholds = roc_curve(true_y,pred_y)
+    metrix['auc'] = auc(fpr, tpr)
     dev_loss = float(dev_losses) / len(data_loader)
     metrix['loss'] = dev_loss
     return metrix
@@ -78,7 +81,7 @@ def test():
         y_preds.extend(y_pred)
     with open(config.output_dir,'w') as f:
         for i in y_preds:
-            f.write(str(i.item())+'\n')
+            f.write('{0:.15f}'.format(i.item())+'\n')
 #test()
 ###################
 def test1(model_dir,output_dir):
@@ -98,21 +101,26 @@ def test1(model_dir,output_dir):
         for i in y_preds:
             f.write(str(i.item())+'\n')
 
-# import os
-# for root,dir,files in os.walk('history_models'):
-#     for file in files:
-#         if file.endswith('.pth'):
-#             output_dir = "output/{}.txt".format(file)
-#             test1(root+'/'+file,output_dir)
-# # scores = [0]*25000
-# # for root,dir,files in os.walk('output'):
+import os
+# # for root,dir,files in os.walk('history_models'):
 # #     for file in files:
-# #         if file.endswith('txt'):
-# #             with open(root+'/'+file,'r') as f:
-# #                 for id,line in enumerate(f.readlines()):
-# #                     line = float(line.strip())
-# #                     scores[id]+=(0.05*line)
-# #
-# # with open('output/result.txt','w') as f:
-# #     for score in scores:
-# #         f.write(str(score)+'\n')
+# #         if file.endswith('.pth'):
+# #             output_dir = "output/{}.txt".format(file)
+# #             test1(root+'/'+file,output_dir)
+scores = [0]*25000
+for root,dir,files in os.walk('output'):
+    for file in files:
+        if file.endswith('txt'):
+            with open(root+'/'+file,'r') as f:
+                for id,line in enumerate(f.readlines()):
+                    line = float(line.strip())
+                    scores[id]+=((1/10)*line)
+#
+with open('output/result.txt','w') as f:
+    for score in scores:
+        f.write(str(score)+'\n')
+import os
+# with open('colab-result.txt','r') as f:
+#     for line in f.readlines():
+#         line = float(line.strip())
+#         print(line)
